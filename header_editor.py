@@ -1,6 +1,7 @@
 import os
 import glob
 from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 
 import argparse
 import shutil
@@ -26,7 +27,7 @@ def edit_header(html_content):
             h3_tag = section.find('h3')
             if h3_tag:
                 h3_tag.name = 'h4'
-    html_content = soup.prettify()
+    html_content = str(soup)
     return html_content
 
 def sidebar_edit(html_content):
@@ -55,7 +56,7 @@ def sidebar_edit(html_content):
             aside.append(div_tag)
             # remove aside tag and keep the content
             aside.unwrap()
-    html_content = soup.prettify()
+    html_content = str(soup)
     return html_content
 
 def edit_note(html_content):
@@ -69,10 +70,44 @@ def edit_note(html_content):
         if h6_tag:
             h6_tag.name = 'p'
             b_tag = soup.new_tag('b')
-            b_tag.string = h6_tag.text
+            b_tag.string = "Note_ " + h6_tag.text
             h6_tag.string = ''
             h6_tag.append(b_tag)
-    html_content = soup.prettify()
+    html_content = str(soup)
+    return html_content
+
+def edit_tip(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # find all data-type="tip" tag in the html content
+    # add custom-style attribute 노트 to the div tag
+    for tip in soup.find_all('div', {'data-type': 'tip'}):
+        tip['custom-style'] = '팁'
+        # make the h6 tag to bold p tag and apply b tag to text
+        h6_tag = tip.find('h6')
+        if h6_tag:
+            h6_tag.name = 'p'
+            b_tag = soup.new_tag('b')
+            b_tag.string = "Tip_ " + h6_tag.text
+            h6_tag.string = ''
+            h6_tag.append(b_tag)
+    html_content = str(soup)
+    return html_content
+
+def edit_warning(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # find all data-type="warning" tag in the html content
+    # add custom-style attribute 노트 to the div tag
+    for warning in soup.find_all('div', {'data-type': 'warning'}):
+        warning['custom-style'] = '경고'
+        # make the h6 tag to bold p tag and apply b tag to text
+        h6_tag = warning.find('h6')
+        if h6_tag:
+            h6_tag.name = 'p'
+            b_tag = soup.new_tag('b')
+            b_tag.string = "Warning_ " + h6_tag.text
+            h6_tag.string = ''
+            h6_tag.append(b_tag)
+    html_content = str(soup)
     return html_content
 
 def edit_figcaption(html_content):
@@ -82,7 +117,7 @@ def edit_figcaption(html_content):
         figcaption = figure.find('h6')
         if figcaption:
             figcaption.name = 'figcaption'
-    html_content = soup.prettify()
+    html_content = str(soup)
     return html_content
 
 def edit_links(html_content):
@@ -94,16 +129,27 @@ def edit_links(html_content):
         if a_tag.get('href').startswith('http'):
             href = a_tag['href']
             text = a_tag.text.strip()
-            new_text = soup.new_string(f'{text}(')
-            new_code = soup.new_tag('span')
+            # create new elements
+            new_text = NavigableString(f'{text}(')
+            new_code = soup.new_tag('code')
             new_code.string = href.strip()
-            # add custom-style attribute inline-code to the span tag
-            new_code['custom-style'] = 'inline-code'
-            new_paren = soup.new_string(')')
-            a_tag.replace_with(new_text)
-            new_text.insert_after(new_code)
-            new_code.insert_after(new_paren)
-    html_content = soup.prettify()
+            new_paren = NavigableString(')')
+            
+            # combine new_text, new_code, and new_paren
+            combined = BeautifulSoup(str(new_text) + str(new_code) + str(new_paren), 'html.parser')
+            
+            # replace the a tag with the new structure
+            a_tag.replace_with(combined)
+    html_content = str(soup)
+    return html_content
+
+def edit_pre_tags(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # find all pre tag in the html content
+    for pre_tag in soup.find_all('pre'):
+        # add xml:space="preserve" attribute to the pre tag
+        pre_tag['xml:space'] = 'preserve'
+    html_content = str(soup)
     return html_content
 
 def edit_html_files(file, output_dir):
@@ -114,7 +160,10 @@ def edit_html_files(file, output_dir):
             content = edit_header(content)
             content = sidebar_edit(content)
             content = edit_note(content)
+            content = edit_tip(content)
+            content = edit_warning(content)
             content = edit_figcaption(content)
+            content = edit_pre_tags(content)
             content = edit_links(content)
         output_file = os.path.join(output_dir, os.path.basename(file))
         with open(output_file, 'w') as f:
